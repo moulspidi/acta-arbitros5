@@ -1236,7 +1236,8 @@ public class ScoreSheetBuilder {
         String guestTeamBackgroundColor = colorIntToHtml(guestColor);
         String guestTeamColor = colorIntToHtml(UiUtils.getTextColor(mContext, guestColor));
         String guestLiberoBackgroundColor = colorIntToHtml(mStoredGame.getLiberoColor(TeamType.GUEST));
-        String guestLiberoColor = colorIntToHtml(UiUtils.getTextColor(mContext, mStoredGame.getLiberoColor(TeamType.GUEST));
+        String guestLiberoColor = colorIntToHtml(
+        UiUtils.getTextColor(mContext, mStoredGame.getLiberoColor(TeamType.GUEST)));
 
         return "<!doctype html>..."; // truncated in this snippet
     }
