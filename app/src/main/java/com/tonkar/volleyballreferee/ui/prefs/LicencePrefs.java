@@ -25,12 +25,15 @@ public class LicencePrefs {
     public String getRef1(String gameId){ return sp.getString(k(gameId,"ref1"), ""); }
     public String getRef2(String gameId){ return sp.getString(k(gameId,"ref2"), ""); }
     public String getScorer(String gameId){ return sp.getString(k(gameId,"scorer"), ""); }
-    public String getHomeCoach(String gameId)  { return mPreferences.getString(K_HOME_COACH  + gameId, null); }
-    public String getGuestCoach(String gameId) { return mPreferences.getString(K_GUEST_COACH + gameId, null); }
-    public String getHomeStaff(String gameId)  { return mPreferences.getString(K_HOME_STAFF  + gameId, null); }
-    public String getGuestStaff(String gameId) { return mPreferences.getString(K_GUEST_STAFF + gameId, null); }
-    public void setHomeCoach(String gameId, String v)  { mEditor.putString(K_HOME_COACH  + gameId, v).apply(); }
-    public void setGuestCoach(String gameId, String v) { mEditor.putString(K_GUEST_COACH + gameId, v).apply(); }
-    public void setHomeStaff(String gameId, String v)  { mEditor.putString(K_HOME_STAFF  + gameId, v).apply(); }
-    public void setGuestStaff(String gameId, String v) { mEditor.putString(K_GUEST_STAFF + gameId, v).apply(); }
+
+    // --- Added persisted fields for assistant coach & staff ---
+    public String getHomeCoach(String gameId){ return sp.getString(k(gameId,"homeCoach"), ""); }
+    public String getGuestCoach(String gameId){ return sp.getString(k(gameId,"guestCoach"), ""); }
+    public String getHomeStaff(String gameId){ return sp.getString(k(gameId,"homeStaff"), ""); }
+    public String getGuestStaff(String gameId){ return sp.getString(k(gameId,"guestStaff"), ""); }
+
+    public void setHomeCoach(String gameId, String v){ sp.edit().putString(k(gameId,"homeCoach"), v == null ? "" : v).apply(); }
+    public void setGuestCoach(String gameId, String v){ sp.edit().putString(k(gameId,"guestCoach"), v == null ? "" : v).apply(); }
+    public void setHomeStaff(String gameId, String v){ sp.edit().putString(k(gameId,"homeStaff"), v == null ? "" : v).apply(); }
+    public void setGuestStaff(String gameId, String v){ sp.edit().putString(k(gameId,"guestStaff"), v == null ? "" : v).apply(); }
 }
