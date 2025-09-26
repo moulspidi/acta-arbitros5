@@ -1,7 +1,7 @@
 package com.tonkar.volleyballreferee.ui.scoresheet;
 
 import android.widget.Toast;
-
+import com.tonkar.volleyballreferee.ui.prefs.LicencePrefs;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
@@ -70,18 +70,10 @@ public class ScoreSheetActivity extends ProgressIndicatorActivity {
 
             mWebView = findViewById(R.id.score_sheet);
 
-            
-            // Load licences from Misc prefs
-            com.tonkar.volleyballreferee.ui.prefs.LicencePrefs lp =
-                    new com.tonkar.volleyballreferee.ui.prefs.LicencePrefs(this);
-            String gid = getIntent().getStringExtra("game");
-            mScoreSheetBuilder
-                    .setReferee1License(lp.getRef1(gid))
-                    .setReferee2License(lp.getRef2(gid))
-                    .setScorerLicense(lp.getScorer(gid));
+            // ---- Cargar licencias desde preferencias (incluyendo Assistant Coach/Staff)
+            applyLicencesToBuilder();
 
             loadScoreSheet(false);
-
 
             FloatingActionButton logoButton = findViewById(R.id.score_sheet_logo_button);
             logoButton.setOnClickListener(v -> selectScoreSheetLogo());
@@ -95,43 +87,46 @@ public class ScoreSheetActivity extends ProgressIndicatorActivity {
             FloatingActionButton saveButton = findViewById(R.id.save_score_sheet_button);
             saveButton.setOnClickListener(v -> createPdfScoreSheet());
 
-            mSelectScoreSheetLogoResultLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(),
-                                                                            result -> {
-                                                                                if (result.getResultCode() == Activity.RESULT_OK) {
-                                                                                    // There are no request codes
-                                                                                    Intent data = result.getData();
-                                                                                    if (data != null) {
-                                                                                        try {
-                                                                                            Uri imageUri = data.getData();
-                                                                                            Bitmap bitmap = MediaStore.Images.Media.getBitmap(
-                                                                                                    getContentResolver(), imageUri);
-                                                                                            ByteArrayOutputStream stream = new ByteArrayOutputStream();
-                                                                                            bitmap.compress(Bitmap.CompressFormat.JPEG, 20,
-                                                                                                            stream);
+            mSelectScoreSheetLogoResultLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    if (result.getResultCode() == Activity.RESULT_OK) {
+                        Intent data = result.getData();
+                        if (data != null) {
+                            try {
+                                Uri imageUri = data.getData();
+                                Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), imageUri);
+                                ByteArrayOutputStream stream = new ByteArrayOutputStream();
+                                bitmap.compress(Bitmap.CompressFormat.JPEG, 20, stream);
 
-                                                                                            String base64Image = Base64.encodeToString(
-                                                                                                    stream.toByteArray(), Base64.NO_WRAP);
-                                                                                            mScoreSheetBuilder.setLogo(base64Image);
-                                                                                            loadScoreSheet(false);
+                                String base64Image = Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP);
+                                mScoreSheetBuilder.setLogo(base64Image);
 
-                                                                                        } catch (IOException e) {
-                                                                                            Log.e(Tags.SCORE_SHEET,
-                                                                                                  "Exception while opening the logo", e);
-                                                                                        }
-                                                                                    }
-                                                                                }
-                                                                            });
+                                // Aseguramos que el builder lleva los últimos datos antes de recargar
+                                applyLicencesToBuilder();
+                                loadScoreSheet(false);
 
-            mCreatePdfScoreSheetResultLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
-                if (result.getResultCode() == Activity.RESULT_OK) {
-                    // There are no request codes
-                    Intent data = result.getData();
-                    if (data != null) {
-                        ScoreSheetPdfConverter scoreSheetPdfConverter = new ScoreSheetPdfConverter(ScoreSheetActivity.this, data.getData());
-                        scoreSheetPdfConverter.convert(mScoreSheetBuilder.createScoreSheet());
+                            } catch (IOException e) {
+                                Log.e(Tags.SCORE_SHEET, "Exception while opening the logo", e);
+                            }
+                        }
                     }
-                }
-            });
+                });
+
+            mCreatePdfScoreSheetResultLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    if (result.getResultCode() == Activity.RESULT_OK) {
+                        Intent data = result.getData();
+                        if (data != null) {
+                            // Aplicamos licencias justo antes de generar el PDF
+                            applyLicencesToBuilder();
+                            ScoreSheetPdfConverter scoreSheetPdfConverter =
+                                    new ScoreSheetPdfConverter(ScoreSheetActivity.this, data.getData());
+                            scoreSheetPdfConverter.convert(mScoreSheetBuilder.createScoreSheet());
+                        }
+                    }
+                });
         }
     }
 
@@ -174,6 +169,9 @@ public class ScoreSheetActivity extends ProgressIndicatorActivity {
     }
 
     void loadScoreSheet(boolean scrollBottom) {
+        // Asegura que el builder lleva los datos de licencias más recientes
+        applyLicencesToBuilder();
+
         ScoreSheetBuilder.ScoreSheet scoreSheet = mScoreSheetBuilder.createScoreSheet();
         mWebView.loadDataWithBaseURL(null, scoreSheet.content(), "text/html", "UTF-8", null);
         if (scrollBottom) {
@@ -183,5 +181,35 @@ public class ScoreSheetActivity extends ProgressIndicatorActivity {
 
     ScoreSheetBuilder getScoreSheetBuilder() {
         return mScoreSheetBuilder;
+    }
+
+    /** Copia las licencias guardadas en prefs al builder antes de generar el acta */
+    private void applyLicencesToBuilder() {
+        if (mScoreSheetBuilder == null) return;
+
+        LicencePrefs lp = new LicencePrefs(this);
+
+        // Id del partido tal y como lo usan tus prefs
+        String gameId = null;
+        try {
+            if (mStoredGame != null) {
+                gameId = mStoredGame.getId();
+            } else {
+                gameId = getIntent().getStringExtra("game");
+            }
+        } catch (Exception ignored) {}
+
+        // Nuevos campos: Assistant Coach & Staff (Home/Guest)
+        mScoreSheetBuilder
+                .setHomeCoachLicense(  lp.getHomeCoach(gameId)  )
+                .setGuestCoachLicense( lp.getGuestCoach(gameId) )
+                .setHomeStaffLicense(  lp.getHomeStaff(gameId)  )
+                .setGuestStaffLicense( lp.getGuestStaff(gameId) );
+
+        // Si también quieres que siempre se vuelquen las licencias de árbitros/anotador:
+        mScoreSheetBuilder
+                .setReferee1License(lp.getRef1(gameId))
+                .setReferee2License(lp.getRef2(gameId))
+                .setScorerLicense(lp.getScorer(gameId));
     }
 }
